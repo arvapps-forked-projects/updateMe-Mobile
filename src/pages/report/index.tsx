@@ -1,66 +1,97 @@
-import FormScreen from '@/components/form';
-import {useFeedback} from '@/states/persistent/feedback';
-import {useToken} from '@/states/persistent/token';
-import {useToast} from '@/states/temporary/toast';
+import * as React from "react";
+import FormScreen from "@/components/form";
+import { useFeedback } from "@/states/persistent/feedback";
+import { Logger } from "@/states/persistent/logs";
+import { useTranslations } from "@/states/persistent/translations";
+import { useToast } from "@/states/runtime/toast";
+import { useSession } from "@/states/runtime/session";
+import { useCurrPageEffect } from "@/hooks/useCurrPageEffect";
+import { Page } from "@/types/navigation";
 
-const FieldsData: Record<string, {label: string; errorMessage: string}> = {
-  name: {
-    label: "What's your name?",
-    errorMessage: 'Name is required',
-  },
-  item: {
-    label: 'Where is the problem?',
-    errorMessage: 'Problem location is required',
-  },
-  description: {
-    label: 'Describe the problem',
-    errorMessage: 'Description is required',
-  },
-};
+const CURR_PAGE: Page = "report";
 
 export default function ReportScreen() {
-  const openToast = useToast().openToast;
-  const {didReport, registerReport} = useFeedback();
+  const openToast = useToast((state) => state.openToast);
+  const [didReport, registerReport] = useFeedback((state) => [
+    state.didReport,
+    state.registerReport,
+  ]);
+  const token = useSession((state) => state.token);
+  const translations = useTranslations((state) => state.translations);
 
-  const init = (setDisabled: (value: boolean) => void) => {
-    setDisabled(false);
-    if (didReport()) {
-      setDisabled(true);
-      openToast('You have already submitted a report today', 'warning');
-    }
-  };
-
-  const submit = (
-    data: Record<string, string>,
-    setDisabled: (value: boolean) => void,
-  ) => {
-    setDisabled(true);
-    fetch('https://updateme.fortunacasino.store/reports', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...data,
-        token: useToken.getState().token,
+  const FieldsData: Record<string, { label: string; errorMessage: string }> =
+    React.useMemo(
+      () => ({
+        name: {
+          label: translations["What's your name?"],
+          errorMessage: translations["Name is required"],
+        },
+        item: {
+          label: translations["Where is the problem?"],
+          errorMessage: translations["Problem location is required"],
+        },
+        description: {
+          label: translations["Describe the problem"],
+          errorMessage: translations["Description is required"],
+        },
       }),
-    })
-      .then(response => {
-        if (response.status === 201) {
-          registerReport();
-          openToast('Report submitted successfully', 'success');
-          return;
-        }
-        response.json().then(data => {
-            openToast(data.message ?? 'Failed to submit report', 'error');
-            setDisabled(false);
-        });
-      })
-      .catch(() => {
-        openToast('Failed to submit report', 'error');
-        setDisabled(false);
-      });
-  };
+      [translations]
+    );
 
-  return <FormScreen fieldsData={FieldsData} init={init} submit={submit} />;
+  const onMount = React.useCallback(
+    (setDisabled: (value: boolean) => void) => {
+      if (didReport()) {
+        setDisabled(true);
+        openToast(translations["You have already submitted a report today"], {
+          type: "warning",
+        });
+      } else setDisabled(false);
+    },
+    [translations]
+  );
+
+  const onSubmit = React.useCallback(
+    (data: Record<string, string>, setDisabled: (value: boolean) => void) => {
+      setDisabled(true);
+      fetch("https://updateme.fortunacasino.store/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...data,
+          token: token,
+        }),
+      })
+        .then((response) => {
+          if (response.status === 201) {
+            registerReport();
+            openToast(translations["Report submitted successfully"], {
+              type: "success",
+            });
+            return;
+          }
+
+          response.json().then((res) => {
+            const message =
+              res.message ?? translations["Failed to submit report"];
+            openToast(message, { type: "error" });
+            setDisabled(false);
+            Logger.error(message);
+          });
+        })
+        .catch((e) => {
+          openToast(translations["Failed to submit report"], { type: "error" });
+          setDisabled(false);
+          Logger.error(`Failed to submit report: ${e}`);
+        });
+    },
+    [translations, token]
+  );
+
+  useCurrPageEffect(CURR_PAGE);
+
+  return (
+    <FormScreen fieldsData={FieldsData} init={onMount} submit={onSubmit} />
+  );
 }

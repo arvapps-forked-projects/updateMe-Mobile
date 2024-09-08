@@ -1,62 +1,75 @@
-import {Image} from 'react-native';
-import {Button, Dialog, Portal} from 'react-native-paper';
-import {Dimensions} from 'react-native';
-import {Share as RNShare} from 'react-native';
-import {useDialogsProps} from '@/states/temporary/dialogs';
-import {useApp} from '@/states/temporary/app';
+import * as React from "react";
+import { Image, StyleSheet, Dimensions } from "react-native";
+import { Button, Dialog } from "react-native-paper";
+import { Share } from "react-native";
+import { useDialogs } from "@/states/runtime/dialogs";
+import { useTranslations } from "@/states/persistent/translations";
+import { useApp } from "@/states/fetched/app";
 
-const qrcode = require('@assets/QRCODE.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const QRCODE_RELEASES = require("@assets/QRCODE.png");
 
-export default function ShareDialog({
-  activeDialog,
-  defaultDialogProps,
-  openDialog,
-  closeDialog,
-}: useDialogsProps) {
-  const info = useApp(state => state.info);
-  const share = () => {
-    RNShare.share(
+const { width } = Dimensions.get("window");
+const QR_CODE_SIZE = width * 0.55;
+
+const ShareDialog = () => {
+  const latestAppInfo = useApp((state) => state.latest);
+  const translations = useTranslations((state) => state.translations);
+  const [activeDialog, closeDialog] = useDialogs((state) => [
+    state.activeDialog,
+    state.closeDialog,
+  ]);
+
+  const handleShare = React.useCallback(() => {
+    closeDialog();
+    Share.share(
       {
-        message: info.download,
-        title: 'UpdateMe Download Link',
+        message: latestAppInfo.download,
+        title: translations["UpdateMe Download Link"],
       },
-      {
-        dialogTitle: 'UpdateMe Download Link',
-      },
+      { dialogTitle: translations["UpdateMe Download Link"] }
     );
-  };
+  }, [latestAppInfo.download, translations]);
+
+  if (activeDialog !== "share") return null;
+
   return (
-    <Portal>
-      <Dialog
-        style={{position: 'relative'}}
-        visible={activeDialog === 'share'}
-        onDismiss={closeDialog}>
-        <Dialog.Title>Share</Dialog.Title>
-        <Dialog.Content
-          style={{
-            alignItems: 'center',
-            justifyContent: 'center',
-            display: 'flex',
-            marginTop: 20,
-            marginBottom: 20,
-            gap: 20,
-          }}>
-          <Image
-            source={qrcode}
-            resizeMode="contain"
-            style={{
-              height: Dimensions.get('window').width * 0.55,
-              width: Dimensions.get('window').width * 0.55,
-            }}
-          />
-          <Button mode="contained-tonal" onPress={share}>
-            Share the download link
-          </Button>
-        </Dialog.Content>
-        <Dialog.Actions>
-          <Button onPress={closeDialog}>Done</Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+    <Dialog visible onDismiss={closeDialog} style={styles.dialog}>
+      <Dialog.Title>{translations["Share"]}</Dialog.Title>
+      <Dialog.Content style={styles.content}>
+        <Image
+          source={QRCODE_RELEASES}
+          resizeMode="contain"
+          style={styles.qrCode}
+        />
+        <Button mode="contained-tonal" onPress={handleShare}>
+          {translations["Share the download link"]}
+        </Button>
+      </Dialog.Content>
+      <Dialog.Actions>
+        <Button onPress={closeDialog}>{translations["Done"]}</Button>
+      </Dialog.Actions>
+    </Dialog>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  dialog: {
+    position: "relative",
+  },
+  content: {
+    alignItems: "center",
+    justifyContent: "center",
+    display: "flex",
+    marginVertical: 20,
+    gap: 20,
+  },
+  qrCode: {
+    height: QR_CODE_SIZE,
+    width: QR_CODE_SIZE,
+  },
+});
+
+export default ShareDialog;
+
+ShareDialog.displayName = "ShareDialog";

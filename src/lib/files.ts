@@ -1,65 +1,90 @@
 import ReactNativeBlobUtil, {
+  FetchBlobResponse,
   ReactNativeBlobUtilStat,
-} from 'react-native-blob-util';
+  StatefulPromise,
+} from "react-native-blob-util";
 
-namespace FilesModule {
-  //----------------------------------------------------------------------------
-  // CONSTANTS
-  export const dir: string = ReactNativeBlobUtil.fs.dirs.DownloadDir;
+const dir: string = ReactNativeBlobUtil.fs.dirs.DownloadDir;
 
-  //---------------------------------------------------------------------------
-  // HELPERS
-  export function correctPath(path: string): string {
-    return path.startsWith(dir) ? path : `${dir}/${path}`;
-  }
+const buildFileName = (appName: string, version: string): string =>
+  `${appName} ${version}.apk`;
 
-  //----------------------------------------------------------------------------
-  // FUNCTIONS
-  export async function getFileInfo(
-    filename: string,
-  ): Promise<ReactNativeBlobUtilStat> {
-    return await ReactNativeBlobUtil.fs.stat(correctPath(filename));
-  }
-
-  export async function listDir(): Promise<string[]> {
-    return (await ReactNativeBlobUtil.fs.ls(dir)).filter(file =>
-      file.endsWith('.apk'),
-    );
-  }
-
-  export async function getAllFilesInfo(): Promise<
-    Record<string, ReactNativeBlobUtilStat>
-  > {
-    const files = await listDir();
-    return await files.reduce(async (accPromise, file) => {
-      const acc = await accPromise;
-      const fileInfo = await getFileInfo(file);
-      return {...acc, [file]: fileInfo};
-    }, Promise.resolve({}));
-  }
-
-  export async function installApk(path: string): Promise<void> {
-    await ReactNativeBlobUtil.android.actionViewIntent(
-      correctPath(path),
-      'application/vnd.android.package-archive',
-    );
-  }
-
-  export async function deleteFile(fileName: string): Promise<void> {
-    await ReactNativeBlobUtil.fs.unlink(correctPath(fileName));
-  }
-
-  export async function deleteMultipleFiles(
-    fileNames: string[],
-  ): Promise<void> {
-    await Promise.all(
-      fileNames.map(async fileName => await deleteFile(correctPath(fileName))),
-    );
-  }
-
-  export async function deleteAllFiles(): Promise<void> {
-    await deleteMultipleFiles(await listDir());
-  }
+function buildAbsolutePath(fileName: string): string {
+  return `${dir}/${fileName}`;
 }
 
-export default FilesModule;
+//----------------------------------------------------------------------------
+// FUNCTIONS
+async function getFileInfo(path: string): Promise<ReactNativeBlobUtilStat> {
+  return await ReactNativeBlobUtil.fs.stat(path);
+}
+
+async function listDir(): Promise<string[]> {
+  return (await ReactNativeBlobUtil.fs.ls(dir)).filter((file) =>
+    file.endsWith(".apk")
+  );
+}
+
+async function getAllFilesInfo(): Promise<
+  Record<string, ReactNativeBlobUtilStat>
+> {
+  const files = await listDir();
+  return await files.reduce(async (accPromise, file) => {
+    const acc = await accPromise;
+    const fileInfo = await getFileInfo(file);
+    return { ...acc, [file]: fileInfo };
+  }, Promise.resolve({}));
+}
+
+async function installApk(path: string): Promise<void> {
+  await ReactNativeBlobUtil.android.actionViewIntent(
+    path,
+    "application/vnd.android.package-archive"
+  );
+}
+
+async function deleteFile(path: string): Promise<void> {
+  await ReactNativeBlobUtil.fs.unlink(path);
+}
+
+async function deleteMultipleFiles(paths: string[]): Promise<void> {
+  await Promise.all(paths.map(async (path) => await deleteFile(path)));
+}
+
+async function deleteAllFiles(): Promise<void> {
+  await deleteMultipleFiles(await listDir());
+}
+
+function downloadFile(
+  url: string,
+  filename: string,
+  path: string,
+  onProgress: (progress: number) => void
+): StatefulPromise<FetchBlobResponse> {
+  return ReactNativeBlobUtil.config({
+    addAndroidDownloads: {
+      useDownloadManager: true,
+      notification: true,
+      title: filename,
+      path,
+      mediaScannable: true,
+    },
+  })
+    .fetch("GET", url, {})
+    .progress((received, total) =>
+      onProgress(parseFloat(received) / parseFloat(total))
+    );
+}
+
+export default {
+  buildAbsolutePath,
+  getFileInfo,
+  listDir,
+  getAllFilesInfo,
+  installApk,
+  deleteFile,
+  deleteMultipleFiles,
+  deleteAllFiles,
+  downloadFile,
+  buildFileName,
+};

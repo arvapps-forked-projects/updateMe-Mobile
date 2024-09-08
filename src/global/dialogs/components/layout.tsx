@@ -1,154 +1,184 @@
-import {
-  Button,
-  Dialog,
-  Portal,
-  SegmentedButtons,
-  Text,
-} from 'react-native-paper';
-import {useEffect, useState} from 'react';
-import {useDialogsProps} from '@/states/temporary/dialogs';
-import {useNavigation} from '@react-navigation/native';
-import Slider from '@react-native-community/slider';
-import {View} from 'react-native';
-import {useSettings} from '@/states/persistent/settings';
-import {useTheme} from '@/theme';
-import MultiIcon from '@/components/multiIcon';
+import * as React from "react";
+import { Button, Dialog, SegmentedButtons, Text } from "react-native-paper";
+import { useDialogs } from "@/states/runtime/dialogs";
+import Slider from "@react-native-community/slider";
+import { StyleSheet, View } from "react-native";
+import { useSettings } from "@/states/persistent/settings";
+import { useTheme } from "@/theme";
+import MultiIcon from "@/components/multiIcon";
+import { IconSource } from "react-native-paper/lib/typescript/components/Icon";
+import { useTranslations } from "@/states/persistent/translations";
+import { useNavigation } from "@react-navigation/native";
+import { NavigationProps } from "@/types/navigation";
+import { Settings } from "@/types/settings";
+import { Logger } from "@/states/persistent/logs";
 
-type HomeLayoutType = 'categories' | 'list' | 'grid';
+type HomeLayoutType = Settings["layout"]["homeStyle"];
 
-export default function HomeLayoutPickerDialog({
-  activeDialog,
-  defaultDialogProps,
-  openDialog,
-  closeDialog,
-}: useDialogsProps) {
-  const {layout, setSetting} = useSettings(state => ({
-    layout: state.settings.layout.homeStyle,
-    setSetting: state.setSetting,
-  }));
-  const [previousLayout, setPreviousLayout] = useState<HomeLayoutType>(layout);
-  const [opacity, setOpacity] = useState(1);
-  const navigation = useNavigation();
-  const theme = useTheme();
+const Buttons: { value: HomeLayoutType; icon: IconSource }[] = [
+  {
+    value: "categories",
+    icon: (props) => (
+      <MultiIcon
+        {...props}
+        size={24}
+        type="material-community"
+        name="format-list-text"
+      />
+    ),
+  },
+  {
+    value: "list",
+    icon: (props) => (
+      <MultiIcon
+        {...props}
+        size={24}
+        type="material-community"
+        name="view-list"
+      />
+    ),
+  },
+  {
+    value: "grid",
+    icon: (props) => (
+      <MultiIcon
+        {...props}
+        size={24}
+        type="material-community"
+        name="view-grid"
+      />
+    ),
+  },
+] as const;
 
-  useEffect(() => {
-    if (activeDialog !== 'homeLayoutPicker') return;
-    setPreviousLayout(layout);
-  }, [activeDialog]);
+const HomeLayoutPickerDialog = () => {
+  const [activeDialog, closeDialog] = useDialogs((state) => [
+    state.activeDialog,
+    state.closeDialog,
+  ]);
+  const [layout, setSetting] = useSettings((state) => [
+    state.settings.layout.homeStyle,
+    state.setSetting,
+  ]);
+  const translations = useTranslations((state) => state.translations);
+
+  const { schemedTheme } = useTheme();
+
+  const { navigate } = useNavigation<NavigationProps>();
+
+  const previousLayout = React.useRef<HomeLayoutType | null>(null);
+  const [opacity, setOpacity] = React.useState(1);
+
+  React.useEffect(() => {
+    if (
+      activeDialog === "homeLayoutPicker" &&
+      previousLayout.current === null
+    ) {
+      previousLayout.current = layout;
+      navigate("apps");
+    } else {
+      previousLayout.current = null;
+    }
+  }, [activeDialog, layout, navigate]);
+
+  const handleLayoutChange = React.useCallback((value: string) => {
+    setSetting("layout", "homeStyle", value as HomeLayoutType);
+  }, []);
+
+  const handleCancel = React.useCallback(() => {
+    if (previousLayout.current === null) {
+      Logger.error("Previous layout is null. Can't revert to previous layout");
+      return;
+    }
+    setSetting("layout", "homeStyle", previousLayout.current);
+    closeDialog();
+    navigate("settings");
+  }, [navigate]);
+
+  const handleApply = React.useCallback(() => {
+    closeDialog();
+    navigate("settings");
+  }, [navigate]);
+
+  if (activeDialog !== "homeLayoutPicker") return null;
 
   return (
-    <Portal>
-      <Dialog
-        style={{
-          opacity: opacity,
-        }}
-        dismissable={false}
-        dismissableBackButton={false}
-        visible={activeDialog === 'homeLayoutPicker'}
-        onDismiss={() => closeDialog()}>
-        <Dialog.Title>Layout</Dialog.Title>
-        <Dialog.Content
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-          <SegmentedButtons
-            style={{
-              marginVertical: 15,
-            }}
-            value={layout}
-            onValueChange={value =>
-              setSetting('layout', 'homeStyle', value as HomeLayoutType)
-            }
-            buttons={[
-              {
-                value: 'categories',
-                icon: props => (
-                  <MultiIcon
-                    {...props}
-                    size={24}
-                    type="material-community"
-                    name="format-list-text"
-                  />
-                ),
-              },
-              {
-                value: 'list',
-                icon: props => (
-                  <MultiIcon
-                    {...props}
-                    size={24}
-                    type="material-community"
-                    name="view-list"
-                  />
-                ),
-              },
-              {
-                value: 'grid',
-                icon: props => (
-                  <MultiIcon
-                    {...props}
-                    size={24}
-                    type="material-community"
-                    name="view-grid"
-                  />
-                ),
-              },
-            ]}
+    <Dialog visible onDismiss={handleCancel} style={{ opacity }}>
+      <Dialog.Title>{translations["Layout"]}</Dialog.Title>
+      <Dialog.Content style={styles.content}>
+        <SegmentedButtons
+          style={styles.segmentedButtons}
+          value={layout}
+          onValueChange={handleLayoutChange}
+          buttons={Buttons}
+        />
+        <View
+          style={[
+            styles.sliderContainer,
+            {
+              backgroundColor: schemedTheme.secondaryContainer,
+              borderColor: schemedTheme.outline,
+            },
+          ]}
+        >
+          <Slider
+            minimumValue={0.25}
+            style={styles.slider}
+            value={opacity}
+            onValueChange={setOpacity}
+            minimumTrackTintColor={schemedTheme.onSecondaryContainer}
+            maximumTrackTintColor={schemedTheme.outline}
+            thumbTintColor={schemedTheme.onSecondaryContainer}
           />
-          <View
-            style={{
-              marginTop: 15,
-              borderWidth: 1,
-              borderRadius: 10,
-              backgroundColor: theme.schemedTheme.secondaryContainer,
-              borderColor: theme.schemedTheme.outline,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 12,
-            }}>
-            <Slider
-              minimumValue={0.25}
-              style={{
-                width: 250,
-              }}
-              value={opacity}
-              onValueChange={value => setOpacity(value)}
-              minimumTrackTintColor={theme.schemedTheme.onSecondaryContainer}
-              maximumTrackTintColor={theme.schemedTheme.outline}
-              thumbTintColor={theme.schemedTheme.onSecondaryContainer}
-            />
-            <Text
-              style={{
-                fontSize: 15,
-                color: theme.schemedTheme.onSecondaryContainer,
-              }}>
-              Opacity
-            </Text>
-          </View>
-        </Dialog.Content>
-        <Dialog.Actions style={{justifyContent: 'space-between'}}>
-          <Button
-            onPress={() => {
-              setSetting('layout', 'homeStyle', previousLayout);
-              closeDialog();
-              navigation.navigate('Settings' as never);
-            }}>
-            Cancel
-          </Button>
-          <Button
-            onPress={() => {
-              closeDialog();
-              navigation.navigate('Settings' as never);
-            }}>
-            Apply
-          </Button>
-        </Dialog.Actions>
-      </Dialog>
-    </Portal>
+          <Text
+            style={[
+              styles.opacityText,
+              { color: schemedTheme.onSecondaryContainer },
+            ]}
+          >
+            {translations["Opacity"]}
+          </Text>
+        </View>
+      </Dialog.Content>
+      <Dialog.Actions style={styles.actions}>
+        <Button onPress={handleCancel}>{translations["Cancel"]}</Button>
+        <Button onPress={handleApply}>{translations["Save"]}</Button>
+      </Dialog.Actions>
+    </Dialog>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  content: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  segmentedButtons: {
+    marginVertical: 15,
+  },
+  sliderContainer: {
+    marginTop: 15,
+    borderWidth: 1,
+    borderRadius: 10,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 12,
+  },
+  slider: {
+    width: 250,
+  },
+  opacityText: {
+    fontSize: 15,
+  },
+  actions: {
+    justifyContent: "space-between",
+  },
+});
+
+HomeLayoutPickerDialog.displayName = "HomeLayoutPickerDialog";
+
+export default HomeLayoutPickerDialog;

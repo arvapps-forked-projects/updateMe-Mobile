@@ -1,131 +1,112 @@
-import {StateStorage, createJSONStorage, persist} from 'zustand/middleware';
-import {MMKV} from 'react-native-mmkv';
-import {create} from 'zustand';
+import { StateStorage, createJSONStorage, persist } from "zustand/middleware";
+import { MMKV } from "react-native-mmkv";
+import { create } from "zustand";
+import {
+  BooleanSettingsSection,
+  BooleanSettingsSectionItem,
+  DEFAULT_SETTINGS,
+  Settings,
+  SettingsSection,
+  SettingsSectionItem,
+  SettingsSectionItemValue,
+} from "@/types/settings";
+import isEqual from "react-fast-compare";
 
-export interface SettingsProps {
-  layout: {
-    homeStyle: 'categories' | 'list' | 'grid';
-  };
-  theme: {
-    sourceColor: string | null;
-    colorScheme: 'system' | 'light' | 'dark';
-  };
-  notifications: {
-    updatesNotification: boolean;
-    newReleaseNotification: boolean;
-  };
-  downloads: {
-    installAfterDownload: boolean;
-    deleteOnLeave: boolean;
-  };
-  security: {
-    installUnsafeApps: boolean;
-  };
-}
+const STORAGE_ID = "settings" as const;
 
-export type SettingsSectionType = keyof SettingsProps;
-
-export type SettingsSectionItemType<T extends SettingsSectionType> =
-  keyof SettingsProps[T];
-
-export type SettingsSectionItemValueType<T extends SettingsSectionType> =
-  SettingsProps[T][SettingsSectionItemType<T>];
-
-const storage = new MMKV({id: 'settings'});
+const storage = new MMKV({ id: STORAGE_ID });
 
 const zustandStorage: StateStorage = {
-  setItem: (name, value) => {
-    return storage.set(name, JSON.stringify(value));
-  },
-  getItem: name => {
-    const value = storage.getString(name);
-    return value ? JSON.parse(value) : null;
-  },
-  removeItem: name => {
-    return storage.delete(name);
-  },
+  setItem: (name, value) => storage.set(name, value),
+  getItem: (name) => storage.getString(name) ?? null,
+  removeItem: (name) => storage.delete(name),
 };
 
-const defaultSettings: SettingsProps = {
-  layout: {
-    homeStyle: 'categories',
-  },
-  theme: {
-    sourceColor: null,
-    colorScheme: 'system',
-  },
-  notifications: {
-    updatesNotification: true,
-    newReleaseNotification: true,
-  },
-  downloads: {
-    installAfterDownload: true,
-    deleteOnLeave: true,
-  },
-  security: {
-    installUnsafeApps: false,
-  },
+type useSettingsState = {
+  settings: Settings;
 };
 
-export interface useSettingsProps {
-  settings: SettingsProps;
-  setSetting: <
-    T extends SettingsSectionType,
-    K extends SettingsSectionItemType<T>,
-  >(
+type useSettingsActions = {
+  setSetting: <T extends keyof Settings, K extends keyof Settings[T]>(
     key: T,
     item: K,
-    value?: SettingsSectionItemValueType<T>,
+    value: Settings[T][K]
   ) => void;
-  resetSetting: <
-    T extends SettingsSectionType,
-    K extends SettingsSectionItemType<T>,
+  toggleSetting: <
+    T extends BooleanSettingsSection,
+    K extends BooleanSettingsSectionItem<T>,
   >(
     key: T,
-    item: K,
+    item: K
   ) => void;
-}
+  resetSetting: <T extends keyof Settings, K extends keyof Settings[T]>(
+    key: T,
+    item: K
+  ) => void;
+};
+
+export type useSettingsProps = useSettingsState & useSettingsActions;
 
 export const useSettings = create<useSettingsProps>()(
   persist(
-    (set, get) => ({
-      settings: defaultSettings,
-      setSetting: <
-        T extends SettingsSectionType,
-        K extends SettingsSectionItemType<T>,
-      >(
+    (set) => ({
+      settings: DEFAULT_SETTINGS,
+      setSetting: <T extends SettingsSection, K extends SettingsSectionItem<T>>(
         key: T,
         item: K,
-        value?: SettingsSectionItemValueType<T>,
+        value: SettingsSectionItemValue<T>
       ) => {
-        if (value === undefined) {
-          value = !(defaultSettings[key][item] as boolean) as any;
-        }
-        set({
-          settings: {
-            ...get().settings,
-            [key]: {...get().settings[key], [item]: value},
-          },
+        set((state) => {
+          const newSettings = {
+            ...state.settings,
+            [key]: { ...state.settings[key], [item]: value },
+          };
+          return isEqual(state.settings, newSettings)
+            ? state
+            : { settings: newSettings };
         });
       },
-      resetSetting: <
-        T extends SettingsSectionType,
-        K extends SettingsSectionItemType<T>,
+      toggleSetting: <
+        T extends BooleanSettingsSection,
+        K extends BooleanSettingsSectionItem<T>,
       >(
         key: T,
-        item: K,
+        item: K
       ) => {
-        set({
+        set((state) => ({
           settings: {
-            ...get().settings,
-            [key]: {...get().settings[key], [item]: defaultSettings[key][item]},
+            ...state.settings,
+            [key]: {
+              ...state.settings[key],
+              [item]: !state.settings[key][item],
+            },
           },
+        }));
+      },
+      resetSetting: <
+        T extends SettingsSection,
+        K extends SettingsSectionItem<T>,
+      >(
+        key: T,
+        item: K
+      ) => {
+        set((state) => {
+          const newSettings = {
+            ...state.settings,
+            [key]: {
+              ...DEFAULT_SETTINGS[key],
+              [item]: DEFAULT_SETTINGS[key][item],
+            },
+          };
+          return isEqual(state.settings, newSettings)
+            ? state
+            : { settings: newSettings };
         });
       },
     }),
     {
-      name: 'settings',
+      name: STORAGE_ID,
       storage: createJSONStorage(() => zustandStorage),
-    },
-  ),
+    }
+  )
 );

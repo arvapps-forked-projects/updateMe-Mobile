@@ -1,54 +1,53 @@
-import {useColorScheme} from 'react-native';
-import {Portal, Snackbar} from 'react-native-paper';
-import React from 'react';
-import {useToast} from '@/states/temporary/toast';
-import {useSettings} from '@/states/persistent/settings';
+import * as React from "react";
+import { Portal, Snackbar } from "react-native-paper";
+import { useToast } from "@/states/runtime/toast";
+import { useTheme } from "@/theme";
 
 const TOAST_COLORS = {
-  success: {
-    light: '#2E7D32',
-    dark: '#81C784',
-  },
-  error: {
-    light: '#D50000',
-    dark: '#E57373',
-  },
-  warning: {
-    light: '#CC8A00',
-    dark: '#FFD54F',
-  },
-};
+	success: {
+		light: "#2E7D32",
+		dark: "#81C784",
+	},
+	error: {
+		light: "#D50000",
+		dark: "#E57373",
+	},
+	warning: {
+		light: "#CC8A00",
+		dark: "#FFD54F",
+	},
+} as const;
 
-export function ToastWrapper({children}: {children: React.ReactNode}) {
-  const {activeToast, closeToast} = useToast(state => ({
-    activeToast: state.activeToast,
-    closeToast: state.closeToast,
-  }));
-  const systemColorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const colorSchemeSetting = useSettings(
-    state => state.settings.theme.colorScheme,
-  );
-  const colorScheme =
-    colorSchemeSetting === 'system' ? systemColorScheme : colorSchemeSetting;
+type ToastType = keyof typeof TOAST_COLORS;
 
-  return (
-    <>
-      <Portal>
-        <Snackbar
-          style={{
-            zIndex: 10000000,
-            ...(activeToast?.type
-              ? {backgroundColor: TOAST_COLORS[activeToast.type][colorScheme]}
-              : {}),
-          }}
-          action={activeToast?.action}
-          visible={activeToast !== null}
-          onDismiss={closeToast}
-          duration={3000}>
-          {activeToast?.message}
-        </Snackbar>
-      </Portal>
-      {children}
-    </>
-  );
+export function Toast() {
+	const [activeToast, closeToast] = useToast((state) => [
+		state.activeToast,
+		state.closeToast,
+	]);
+	const { colorScheme } = useTheme();
+
+	const snackbarStyle = React.useMemo(() => {
+		return {
+			zIndex: 10000000,
+			...(activeToast?.type && {
+				backgroundColor:
+					TOAST_COLORS[activeToast.type as ToastType][colorScheme],
+			}),
+		};
+	}, [activeToast, colorScheme]);
+
+	return (
+		<Portal>
+			<Snackbar
+				style={snackbarStyle}
+				action={activeToast?.action}
+				visible={!!activeToast}
+				onDismiss={closeToast}
+				duration={3000}
+			>
+				{activeToast?.message}
+			</Snackbar>
+		</Portal>
+	);
 }

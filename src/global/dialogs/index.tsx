@@ -1,60 +1,36 @@
-import {useDialogs} from '@/states/temporary/dialogs';
-import DefaultDialog from './components/default';
-import SourceColorPickerDialog from './components/appearance';
-import ColorSchemePickerDialog from './components/scheme';
-import HomeLayoutPickerDialog from './components/layout';
-import ShareDialog from './components/share';
-import NewVersionDialog from './components/newVersion';
+import * as React from "react";
+import { useDialogs } from "@/states/runtime/dialogs";
+import SourceColorPickerDialog from "./components/appearance";
+import ColorSchemePickerDialog from "./components/scheme";
+import HomeLayoutPickerDialog from "./components/layout";
+import ShareDialog from "./components/share";
+import NewVersionDialog from "./components/newVersion";
+import { Portal } from "react-native-paper";
+import CustomDialog from "./components/custom";
 
-export function DialogsWrapper({children}: {children: React.ReactNode}) {
-  const {activeDialog, defaultDialogProps, openDialog, closeDialog} =
-    useDialogs(state => ({
-      activeDialog: state.activeDialog,
-      defaultDialogProps: state.defaultDialogProps,
-      openDialog: state.openDialog,
-      closeDialog: state.closeDialog,
-    }));
+const DialogComponents = {
+  custom: CustomDialog,
+  sourceColorPicker: SourceColorPickerDialog,
+  colorSchemePicker: ColorSchemePickerDialog,
+  homeLayoutPicker: HomeLayoutPickerDialog,
+  share: ShareDialog,
+  newVersion: NewVersionDialog,
+};
+
+export function Dialogs() {
+  const activeDialog = useDialogs((state) => state.activeDialog);
+
+  const ActiveDialog = React.useMemo(() => {
+    return activeDialog ? DialogComponents[activeDialog] : null;
+  }, [activeDialog]);
+
+  if (!ActiveDialog) {
+    return null;
+  }
 
   return (
-    <>
-      {children}
-      <DefaultDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-      <SourceColorPickerDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-      <ColorSchemePickerDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-      <HomeLayoutPickerDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-      <ShareDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-
-      <NewVersionDialog
-        activeDialog={activeDialog}
-        defaultDialogProps={defaultDialogProps}
-        openDialog={openDialog}
-        closeDialog={closeDialog}
-      />
-    </>
+    <Portal>
+      <ActiveDialog />
+    </Portal>
   );
 }

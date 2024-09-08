@@ -1,82 +1,90 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React, {useEffect} from 'react';
-import {SafeAreaView, StatusBar, View} from 'react-native';
-import Pages from '@/pages';
-import FilesModule from '@/lib/files';
-import {useTheme} from '@/theme';
-import DrawerWrapper from '@/global/drawer';
-import {useSettings} from '@/states/persistent/settings';
-import {useDialogs} from '@/states/temporary/dialogs';
-import {useApp} from '@/states/temporary/app';
-import {useTips} from '@/states/temporary/tips';
-import PermissionsModule from '@/lib/permissions';
-import { initBackgroundTasks } from '@/lib/background';
-import { useToken } from '@/states/persistent/token';
+import * as React from "react";
+import {
+  SafeAreaView,
+  StatusBar,
+  StatusBarStyle,
+  StyleSheet,
+  View,
+} from "react-native";
+import FilesModule from "@/lib/files";
+import { useTheme } from "@/theme";
+import DrawerWrapper from "@/global/drawer";
+import { useSettings } from "@/states/persistent/settings";
+import { useDialogs } from "@/states/runtime/dialogs";
+import { useTips } from "@/states/fetched/tips";
+import PermissionsModule from "@/lib/permissions";
+import BackgroundTasksModule from "@/lib/backgroundTasks";
+import MainStack from "@/navigation";
+import { useApp } from "@/states/fetched/app";
 
 function App(): React.JSX.Element {
   const theme = useTheme();
   const deleteOnLeave = useSettings(
-    state => state.settings.downloads.deleteOnLeave,
+    (state) => state.settings.downloads.deleteOnLeave
   );
-  const [info, localVersion] = useApp(state => [
-    state.info,
+  const openDialog = useDialogs((state) => state.openDialog);
+  const fetchTips = useTips((state) => state.fetch);
+  const [info, localVersion] = useApp((state) => [
+    state.latest,
     state.localVersion,
   ]);
-  const openDialog = useDialogs().openDialog;
-  const fetchTips = useTips().fetchTips;
-  const [releaseNotification, updateNotification] = useSettings(state => [
+  const [releaseNotification, updateNotification] = useSettings((state) => [
     state.settings.notifications.newReleaseNotification,
     state.settings.notifications.updatesNotification,
   ]);
-    
 
-  useEffect(() => {
-    if (info.version && localVersion && info.version > localVersion)
-      openDialog('newVersion');
-  }, [info]);
+  React.useEffect(() => {
+    if (localVersion && info.version && info.version > localVersion)
+      openDialog("newVersion");
+  }, [info, localVersion]);
 
-  useEffect(() => {
-    useToken.getState().init();
+  React.useEffect(() => {
     if (releaseNotification || updateNotification) {
-      PermissionsModule.grantPostNotification().then(_ =>
-        initBackgroundTasks(),
+      PermissionsModule.grantPostNotification().then((_) =>
+        BackgroundTasksModule.initBackgroundTasks()
       );
     }
-    const fun = () => deleteOnLeave && FilesModule.deleteAllFiles();
-    fun();
-    fetchTips();
-    return () => {
-      fun();
-    };
-  }, []);
+  }, [releaseNotification, updateNotification]);
+
+  React.useEffect(() => {
+    fetchTips(); // Fetch tips from the server
+
+    if (deleteOnLeave)
+      return () => {
+        FilesModule.deleteAllFiles();
+      }; // Clean up files on app enter (In case it didn't clean up on exit)
+  }, [deleteOnLeave]);
+
+  const statusBarProps: {
+    backgroundColor: string;
+    barStyle: StatusBarStyle;
+  } = React.useMemo(
+    () => ({
+      backgroundColor: theme.schemedTheme.surfaceContainer,
+      barStyle: theme.colorScheme === "dark" ? "light-content" : "dark-content",
+    }),
+    [theme.schemedTheme, theme.colorScheme]
+  );
 
   return (
     <>
-      <StatusBar
-        backgroundColor={theme.schemedTheme.surfaceContainer}
-        barStyle={
-          theme.colorScheme === 'dark' ? 'light-content' : 'dark-content'
-        }
-      />
+      <StatusBar {...statusBarProps} />
       <SafeAreaView>
-        <View
-          style={{
-            width: '100%',
-            height: '100%',
-          }}>
+        <View style={styles.appWrapper}>
           <DrawerWrapper>
-            <Pages />
+            <MainStack />
           </DrawerWrapper>
         </View>
       </SafeAreaView>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  appWrapper: {
+    width: "100%",
+    height: "100%",
+  },
+});
 
 export default App;

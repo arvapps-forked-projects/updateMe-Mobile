@@ -1,88 +1,118 @@
-import FormScreen from '@/components/form';
-import {useFeedback} from '@/states/persistent/feedback';
-import {useToken} from '@/states/persistent/token';
-import {useToast} from '@/states/temporary/toast';
-import {useEffect, useState} from 'react';
-import SuggestionsStats from './stats';
-import {useFocusEffect} from '@react-navigation/native';
+import * as React from "react";
+import FormScreen from "@/components/form";
+import { useFeedback } from "@/states/persistent/feedback";
+import { useToast } from "@/states/runtime/toast";
+import SuggestionsStats from "./stats";
+import { useTranslations } from "@/states/persistent/translations";
+import { Logger } from "@/states/persistent/logs";
+import { useSession } from "@/states/runtime/session";
+import { Page } from "@/types/navigation";
+import { useCurrPageEffect } from "@/hooks/useCurrPageEffect";
 
-const FieldsData: Record<string, {label: string; errorMessage: string}> = {
-  name: {
-    label: "What's your name?",
-    errorMessage: 'Name is required',
-  },
-  app: {
-    label: 'Which app do you want to suggest?',
-    errorMessage: 'App name is required',
-  },
-  description: {
-    label: 'Are you looking for a specific feature?',
-    errorMessage: '',
-  },
-};
+const CURR_PAGE: Page = "suggest";
 
 export default function SuggestScreen() {
-  const openToast = useToast().openToast;
-  const {didSuggest, registerSuggestion} = useFeedback();
-  const [appsSuggestions, setAppsSuggestions] = useState<string[]>([]);
-  const [suggested, setSuggested] = useState(false);
+  const openToast = useToast((state) => state.openToast);
+  const [didSuggest, registerSuggestion] = useFeedback((state) => [
+    state.didSuggest,
+    state.registerSuggestion,
+  ]);
+  const [appsSuggestions, setAppsSuggestions] = React.useState<string[]>([]);
+  const [suggested, setSuggested] = React.useState(false);
+  const translations = useTranslations((state) => state.translations);
+  const token = useSession((state) => state.token);
 
-  const init = (setDisabled: (value: boolean) => void) => {
-    setDisabled(false);
-    setAppsSuggestions([]);
-    if (didSuggest()) {
-      setSuggested(true);
-      openToast('You can only suggest one app per day');
-    }
-  };
-
-  const submit = (
-    data: Record<string, string>,
-    setDisabled: (value: boolean) => void,
-  ) => {
-    setAppsSuggestions([]);
-    setDisabled(true);
-    fetch('https://updateme.fortunacasino.store/suggestions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...data,
-        token: useToken.getState().token,
+  const FieldsData: Record<string, { label: string; errorMessage: string }> =
+    React.useMemo(
+      () => ({
+        name: {
+          label: translations["What's your name?"],
+          errorMessage: translations["Name is required"],
+        },
+        app: {
+          label: translations["Which app do you want to suggest?"],
+          errorMessage: translations["App name is required"],
+        },
+        description: {
+          label: translations["Are you looking for a specific feature?"],
+          errorMessage: "",
+        },
       }),
-    })
-      .then(response => {
-        if (response.status === 201) {
-          registerSuggestion();
-          setSuggested(true);
-          openToast('Report submitted successfully', 'success');
-          return;
-        }
-        response.json().then(data => {
-          if (data.apps) {
-            setAppsSuggestions(data.apps);
-          }
-          openToast(data.message ?? 'Failed to submit report', 'error');
-          setDisabled(false);
-        });
-      })
-      .catch(() => {
-        openToast('Failed to submit suggestion', 'error');
-        setDisabled(false);
-      });
-  };
+      [translations]
+    );
 
-  return suggested ? (
-    <SuggestionsStats />
-  ) : (
+  const onMount = React.useCallback(
+    (setDisabled: (value: boolean) => void) => {
+      setAppsSuggestions([]);
+      if (didSuggest()) {
+        setSuggested(true);
+        openToast(translations["You can only suggest one app per day"], {
+          type: "warning",
+        });
+      } else setDisabled(false);
+    },
+    [translations]
+  );
+
+  const onSubmit = React.useCallback(
+    (data: Record<string, string>, setDisabled: (value: boolean) => void) => {
+      setAppsSuggestions([]);
+      setDisabled(true);
+      fetch("https://updateme.fortunacasino.store/suggestions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...data,
+          token,
+        }),
+      })
+        .then((response) => {
+          if (response.status === 201) {
+            registerSuggestion();
+            setSuggested(true);
+            openToast(translations["Suggestion submitted successfully"], {
+              type: "success",
+            });
+            return;
+          }
+          response.json().then((res) => {
+            if (res.apps) {
+              setAppsSuggestions(res.apps);
+            }
+            const message =
+              res.message ?? translations["Failed to submit suggestion"];
+            openToast(message, { type: "error" });
+            setDisabled(false);
+            Logger.error(message);
+          });
+        })
+        .catch((e) => {
+          openToast(translations["Failed to submit suggestion"], {
+            type: "error",
+          });
+          setDisabled(false);
+          Logger.error(`Failed to submit suggestion: ${e}`);
+        });
+    },
+    [translations, token]
+  );
+
+  useCurrPageEffect(CURR_PAGE);
+
+  if (suggested) {
+    return <SuggestionsStats />;
+  }
+
+  return (
     <FormScreen
       fieldsData={{
         ...FieldsData,
-        app: {...FieldsData.app, suggestions: appsSuggestions},
+        app: { ...FieldsData.app, suggestions: appsSuggestions },
       }}
-      init={init}
-      submit={submit}
+      init={onMount}
+      submit={onSubmit}
     />
   );
 }

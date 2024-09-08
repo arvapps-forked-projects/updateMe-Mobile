@@ -1,48 +1,52 @@
-import {NativeModules} from 'react-native';
+import { useTranslations } from "@/states/persistent/translations";
+import { NativeModules } from "react-native";
 
-const {NotificationsModule} = NativeModules;
-
-namespace Notifications {
-  export function createChannel(
+interface NotificationsModuleInterface {
+  createChannel(
     channelId: string,
     channelName: string,
-    channelDescription: string,
-  ): Promise<void> {
-    return NotificationsModule.createChannel(
-      channelId,
-      channelName,
-      channelDescription,
-    );
-  }
-
-  export function sendNotification(
+    channelDescription: string
+  ): Promise<void>;
+  sendNotification(
     channelId: string,
     title: string,
-    message: string,
-  ): Promise<number> {
-    return NotificationsModule.sendNotification(channelId, title, message);
-  }
+    message: string
+  ): Promise<number>;
 }
+
+const NotificationsNativeModule: NotificationsModuleInterface =
+  NativeModules.NotificationsModule;
 
 const ChannelsProps = {
-  'new-release': {
-    name: 'New Release',
-    description: 'Notifications for new releases',
+  "new-release": {
+    name: "New Release",
+    description: "Notifications for new releases",
   },
-  'app-updates': {
-    name: 'App Updates',
-    description: 'Notifications for app updates',
+  "app-updates": {
+    name: "App Updates",
+    description: "Notifications for app updates",
   },
-};
+} as const;
 
-export function sendNotification(
+async function sendNotification(
   title: string,
   message: string,
-  channelId: keyof typeof ChannelsProps,
+  channelId: keyof typeof ChannelsProps
 ) {
-  return Notifications.createChannel(
+  const translations = useTranslations.getState().translations;
+
+  await NotificationsNativeModule.createChannel(
     channelId,
-    ChannelsProps[channelId].name,
-    ChannelsProps[channelId].description,
-  ).then(res => Notifications.sendNotification(channelId, title, message));
+    translations[ChannelsProps[channelId].name],
+    translations[ChannelsProps[channelId].description]
+  );
+  return await NotificationsNativeModule.sendNotification(
+    channelId,
+    title,
+    message
+  );
 }
+
+export default {
+  sendNotification,
+};

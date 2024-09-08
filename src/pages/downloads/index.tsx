@@ -1,81 +1,100 @@
-import {View} from 'react-native';
-import {ScrollView} from 'react-native-gesture-handler';
-import {Icon as RNIcon, Text} from 'react-native-paper';
-import {useState} from 'react';
-import {ReactNativeBlobUtilStat} from 'react-native-blob-util';
-import {useDownloads, useDownloadsProps} from '@/states/temporary/downloads';
-import FilesModule from '@/lib/files';
-import useScreenCallback from '@/hooks/screenCallback';
-import ThemedRefreshControl from '@/components/refreshControl';
-import {useTheme} from '@/theme';
-import Downloading from './components/downloading';
-import Downloaded from './components/downloaded';
+import * as React from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Icon, Text } from "react-native-paper";
+import { ReactNativeBlobUtilStat } from "react-native-blob-util";
+import { useFocusEffect } from "@react-navigation/native";
+import FilesModule from "@/lib/files";
+import ThemedRefreshControl from "@/components/refreshControl";
+import Downloading from "./components/downloading";
+import Downloaded from "./components/downloaded";
+import { useDownloads } from "@/states/runtime/downloads";
+import { useTranslations } from "@/states/persistent/translations";
+import { Page } from "@/types/navigation";
+import { useCurrPageEffect } from "@/hooks/useCurrPageEffect";
 
-export interface DownloadsScreenChildProps extends useDownloadsProps {
-  navigation: any;
-  route: any;
-  files: Record<string, ReactNativeBlobUtilStat>;
-}
+const CURR_PAGE: Page = "downloads";
 
-export default function DownloadsScreen({navigation, route}: any) {
-  const theme = useTheme();
-  const {downloads, addDownload, cancelDownload} = useDownloads();
-  const [files, setFiles] = useState<Record<string, ReactNativeBlobUtilStat>>(
-    {},
+const REFRESH_INTERVAL = 2500;
+
+const DownloadsScreen = () => {
+  const downloads = useDownloads((state) => state.downloads);
+  const [files, setFiles] = React.useState<
+    Record<string, ReactNativeBlobUtilStat>
+  >({});
+  const translations = useTranslations((state) => state.translations);
+
+  const updateFiles = React.useCallback(() => {
+    FilesModule.getAllFilesInfo().then((newFiles) => {
+      setFiles((prevFiles) =>
+        JSON.stringify(prevFiles) === JSON.stringify(newFiles)
+          ? prevFiles
+          : newFiles
+      );
+    });
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const interval = setInterval(updateFiles, REFRESH_INTERVAL);
+      return () => clearInterval(interval);
+    }, [updateFiles])
   );
 
-  const updateFiles = () => {
-    FilesModule.getAllFilesInfo().then(files => {
-      const filteredFiles = Object.fromEntries(
-        Object.entries(files).filter(
-          ([file]) => !Object.keys(downloads).includes(file),
-        ),
-      );
-      setFiles(filteredFiles);
-    });
-  };
+  const downloadingFiles = Object.entries(files).reduce(
+    (acc, [key, value]) => {
+      if (downloads[key]) {
+        acc[key] = value;
+      }
+      return acc;
+    },
+    {} as Record<string, ReactNativeBlobUtilStat>
+  );
 
-  useScreenCallback({
-    repeat: {callback: updateFiles, interval: 1000},
-  });
+  const downloadedFiles = Object.entries(files).reduce(
+    (acc, [key, value]) => {
+      if (!downloads[key]) {
+        acc[key] = value;
+      }
+      return acc;
+    },
+    {} as Record<string, ReactNativeBlobUtilStat>
+  );
 
-  return Object.keys(downloads).length == 0 &&
-    Object.keys(files).length == 0 ? (
-    <View
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <RNIcon source="delete-empty" size={50} />
-      <Text variant="bodyLarge">No files downloaded</Text>
-    </View>
-  ) : (
+  useCurrPageEffect(CURR_PAGE);
+
+  if (Object.keys(files).length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Icon source="delete-empty" size={50} />
+        <Text variant="bodyLarge">{translations["No files downloaded"]}</Text>
+      </View>
+    );
+  }
+
+  return (
     <ScrollView
-      refreshControl={ThemedRefreshControl(theme, {
+      refreshControl={ThemedRefreshControl({
         onRefresh: updateFiles,
         refreshing: false,
-      })}>
-      <Downloading
-        navigation={navigation}
-        route={route}
-        downloads={downloads}
-        files={files}
-        addDownload={addDownload}
-        cancelDownload={cancelDownload}
-      />
-      <Downloaded
-        navigation={navigation}
-        route={route}
-        downloads={downloads}
-        files={files}
-        addDownload={addDownload}
-        cancelDownload={cancelDownload}
-        updateFiles={updateFiles}
-      />
+      })}
+    >
+      <Downloading files={downloadingFiles} />
+      <Downloaded files={downloadedFiles} updateFiles={updateFiles} />
     </ScrollView>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  emptyContainer: {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+DownloadsScreen.displayName = "DownloadsScreen";
+
+export default DownloadsScreen;

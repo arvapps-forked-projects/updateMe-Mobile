@@ -1,29 +1,25 @@
-/**
- * @format
- */
+import * as React from "react";
+import { AppRegistry } from "react-native";
+import App from "./App";
+import { name as appName } from "./app.json";
+import "react-native-gesture-handler";
+import { ThemeProvider } from "@/theme";
+import BackgroundFetch from "react-native-background-fetch";
+import { Toast } from "@/global/toast";
+import { Dialogs } from "@/global/dialogs";
+import { StatesBridgeManager } from "@/states/bridge";
+import BackgroundTasksModule from "@/lib/backgroundTasks";
 
-import {AppRegistry} from 'react-native';
-import App from './App';
-import {name as appName} from './app.json';
-import 'react-native-gesture-handler';
-import {ThemeProvider} from '@/theme';
-import {ToastWrapper} from '@/global/toast';
-import {DialogsWrapper} from '@/global/dialogs';
-import BackgroundFetch from 'react-native-background-fetch';
-import {headlessTask} from '@/lib/background';
-
-BackgroundFetch.registerHeadlessTask(headlessTask);
+BackgroundFetch.registerHeadlessTask(BackgroundTasksModule.headlessTask);
 function Root() {
   return (
     <ThemeProvider>
-      <ToastWrapper>
-        <DialogsWrapper>
-          <App />
-        </DialogsWrapper>
-      </ToastWrapper>
+      <Toast />
+      <Dialogs />
+      <App />
+      <StatesBridgeManager />
     </ThemeProvider>
   );
 }
 
 AppRegistry.registerComponent(appName, () => Root);
-
