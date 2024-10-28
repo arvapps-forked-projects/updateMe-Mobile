@@ -62,6 +62,8 @@ const styles = StyleSheet.create({
   appIcon: {
     width: 25,
     height: 25,
+    borderRadius: 5,
+    overflow: 'hidden',
   },
   homeItem: {
     paddingLeft: 25,
