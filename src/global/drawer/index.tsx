@@ -8,8 +8,8 @@ import {Dialog, useDialogs} from '@/states/runtime/dialogs';
 import {useDownloads} from '@/states/runtime/downloads';
 import {useTranslations} from '@/states/persistent/translations';
 import {useNavigation} from '@react-navigation/native';
-import {NavigationProps} from '@/types/navigation';
-import {usePulsing} from '@/hooks/usePulsing';
+import {MainStackPage, NavigationProps} from '@/types/navigation';
+import {usePulsingStyles} from '@/hooks/usePulsing';
 import {
   ListRenderItem,
   FlatList,
@@ -30,6 +30,7 @@ interface DrawerItem {
   description: string;
   icon: string;
   onClick: () => void;
+  style?: {opacity: number};
 }
 
 const renderListIcon =
@@ -53,19 +54,11 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
   const hasDownloads = useDownloads(state => state.hasDownloads);
   const openDialog = useDialogs(state => state.openDialog);
   const translations = useTranslations(state => state.translations);
-  const {startPulsing, cancelPulsing, pulsingStyles} = usePulsing();
 
-  React.useEffect(() => {
-    if (isDrawerOpen && hasDownloads) {
-      startPulsing();
-    }
-    return () => {
-      cancelPulsing();
-    };
-  }, [isDrawerOpen, hasDownloads, startPulsing, cancelPulsing]);
+  const pulsingStyles = usePulsingStyles(hasDownloads && isDrawerOpen);
 
   const navigateTo = React.useCallback(
-    (route: 'downloads' | 'updates' | 'tips' | 'settings' | 'suggest') => {
+    (route: MainStackPage) => {
       closeDrawer();
       navigate(route);
     },
@@ -77,7 +70,7 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
     openDialog(key);
   }, []);
 
-  const items = React.useMemo(
+  const items: DrawerItem[] = React.useMemo(
     () => [
       {
         key: 'downloads',
@@ -85,6 +78,7 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
         description: translations['View your downloads'],
         icon: 'download',
         onClick: () => navigateTo('downloads'),
+        style: pulsingStyles,
       },
       {
         key: 'updates',
@@ -98,7 +92,7 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
         title: translations['Tips'],
         description: translations['Maximize your experience'],
         icon: 'star-four-points',
-        onClick: () => navigateTo('tips'),
+        onClick: () => navigateTo('tips-stack'),
       },
       {
         key: 'settings',
@@ -106,13 +100,6 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
         description: translations['Change the app settings'],
         icon: 'cog',
         onClick: () => navigateTo('settings'),
-      },
-      {
-        key: 'suggest',
-        title: translations['Suggest'],
-        description: translations['Suggest a new app'],
-        icon: 'lightbulb-on',
-        onClick: () => navigateTo('suggest'),
       },
       {
         key: 'share',
@@ -139,7 +126,7 @@ const DrawerWrapper = ({children}: DrawerWrapperProps) => {
         description={item.description}
         left={renderListIcon(item.icon)}
         onPress={item.onClick}
-        style={item.key === 'downloads' ? pulsingStyles : undefined}
+        style={item.style}
       />
     ),
     [],
@@ -179,7 +166,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
-DrawerWrapper.displayName = 'DrawerWrapper';
 
 export default DrawerWrapper;

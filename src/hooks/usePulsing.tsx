@@ -24,13 +24,14 @@ export function usePulsing() {
         },
         afterPulsing,
       ),
-      -1,
+      6,
       true,
     );
   }, []);
 
   const cancelPulsing = React.useCallback(() => {
     cancelAnimation(opacity);
+    opacity.value = 1;
   }, []);
 
   const pulsingStyles = useAnimatedStyle(() => ({
@@ -45,14 +46,23 @@ export function usePulsingStyles(pulse: boolean) {
   const isPulsing = React.useRef(false);
 
   React.useEffect(() => {
-    if (isPulsing.current || !pulse) return;
+    'worklet';
+    if (isPulsing.current || !pulse) {
+      if (!pulse) {
+        cancelPulsing();
+        isPulsing.current = false;
+      }
+      return;
+    }
 
     startPulsing(() => {
+      'worklet';
       isPulsing.current = false;
     });
     isPulsing.current = true;
 
     return () => {
+      'worklet';
       if (isPulsing.current) {
         cancelPulsing();
         isPulsing.current = false;
