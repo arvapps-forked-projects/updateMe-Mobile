@@ -4,8 +4,18 @@ import {create} from 'zustand';
 import {deepEqual} from 'fast-equals';
 
 import {Index, IndexApp} from '@/states/fetched/index';
+import {migrate} from '../utils';
 
 const STORAGE_ID = 'default-providers' as const;
+
+const PERSISTED_KEYS: Array<keyof useDefaultProvidersState> = [
+  'defaultProviders',
+];
+
+const DEFAULT_STATE = {
+  defaultProviders: {},
+  populatedDefaultProviders: {},
+};
 
 export type DefaultProviders = Record<IndexApp, string>;
 
@@ -87,6 +97,14 @@ export const useDefaultProviders = create<useDefaultProvidersProps>()(
     {
       name: STORAGE_ID,
       storage: createJSONStorage(() => zustandStorage),
+      migrate: (persistedState, version) =>
+        migrate(DEFAULT_STATE, persistedState, version),
+      partialize: state =>
+        Object.fromEntries(
+          Object.entries(state).filter(([key]) =>
+            PERSISTED_KEYS.includes(key as keyof useDefaultProvidersState),
+          ),
+        ),
     },
   ),
 );

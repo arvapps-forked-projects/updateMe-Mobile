@@ -2,27 +2,29 @@ import * as React from 'react';
 import {List} from 'react-native-paper';
 import {SectionComponentDataInferred} from '../data';
 import SettingsItem from './SettingsItem';
+import {View} from 'react-native';
 
-/*******************************************************************************
- *                                  COMPONENT                                  *
- *******************************************************************************/
+/******************************************************************************
+ *                                 COMPONENT                                  *
+ ******************************************************************************/
 
 interface SettingsSectionProps {
-  item: SectionComponentDataInferred;
+  section: SectionComponentDataInferred;
+  scrollToItem: (itemRef: React.RefObject<View>) => void;
 }
 
-const SettingsSection = ({item: section}: SettingsSectionProps) => {
+const SettingsSection = ({section, scrollToItem}: SettingsSectionProps) => {
   return (
     <List.Section title={section.title}>
       {section.items.map(item => (
-        <SettingsItem key={item.key} data={item} />
+        <SettingsItem key={item.key} data={item} scrollToItem={scrollToItem} />
       ))}
     </List.Section>
   );
 };
 
-/*******************************************************************************
- *                                    EXPORT                                   *
- *******************************************************************************/
+/******************************************************************************
+ *                                   EXPORT                                   *
+ ******************************************************************************/
 
 export default SettingsSection;

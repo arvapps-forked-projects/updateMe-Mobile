@@ -6,8 +6,19 @@ import {
   DEFAULT_TRANSLATIONS,
   Translation,
 } from '@/types/translations';
+import {migrate} from '../utils';
 
 const STORAGE_ID = 'translations' as const;
+
+const PERSISTED_KEYS: Array<keyof useTranslationsState> = [
+  'language',
+  'translations',
+];
+
+const DEFAULT_STATE = {
+  language: DEFAULT_LANGUAGE,
+  translations: DEFAULT_TRANSLATIONS,
+};
 
 export const interpolate = (template: string, ...values: string[]): string =>
   template.replace(/\$(\d+)/g, (match, index) => values[+index - 1] ?? match);
@@ -60,6 +71,14 @@ export const useTranslations = create<useTranslationsProps>()(
     {
       name: STORAGE_ID,
       storage: createJSONStorage(() => zustandStorage),
+      migrate: (persistedState, version) =>
+        migrate(DEFAULT_STATE, persistedState, version),
+      partialize: state =>
+        Object.fromEntries(
+          Object.entries(state).filter(([key]) =>
+            PERSISTED_KEYS.includes(key as keyof useTranslationsState),
+          ),
+        ),
     },
   ),
 );

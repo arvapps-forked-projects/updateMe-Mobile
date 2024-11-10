@@ -2,8 +2,17 @@ import {StateStorage, createJSONStorage, persist} from 'zustand/middleware';
 import {MMKV} from 'react-native-mmkv';
 import {create} from 'zustand';
 import {deepEqual} from 'fast-equals';
+import {migrate} from '../utils';
 
 const STORAGE_ID = 'notifications' as const;
+
+const PERSISTED_KEYS: Array<keyof useNotificationsState> = [
+  'newVersionsNotifications',
+];
+
+const DEFAULT_STATE = {
+  newVersionsNotifications: {},
+};
 
 const storage = new MMKV({id: STORAGE_ID});
 
@@ -13,35 +22,63 @@ const zustandStorage: StateStorage = {
   removeItem: name => storage.delete(name),
 };
 
+type NewVersionNotification = {
+  version: string;
+  sha256?: string;
+};
+
 type useNotificationsState = {
-  appsVersionsSent: Record<string, string>;
+  newVersionsNotifications: Record<string, NewVersionNotification>;
 };
 
 type useNotificationsActions = {
-  addAppVersionSent: (appName: string, version: string) => void;
+  registerNewVersionNotification: (
+    appName: string,
+    version: string,
+    sha256?: string,
+  ) => void;
 };
 
 export type useNotificationsProps = useNotificationsState &
   useNotificationsActions;
+
 export const useNotifications = create<useNotificationsProps>()(
   persist(
     set => ({
-      appsVersionsSent: {},
-      addAppVersionSent: (appName, version) => {
+      newVersionsNotifications: {},
+      registerNewVersionNotification: (
+        appName,
+        version,
+        sha256 = undefined,
+      ) => {
         set(state => {
-          const newAppsVersionsSent = {
-            ...state.appsVersionsSent,
-            [appName]: version,
+          const newVersionsNotifications = {
+            ...state.newVersionsNotifications,
+            [appName]: {
+              version,
+              sha256,
+            },
           };
-          return deepEqual(state.appsVersionsSent, newAppsVersionsSent)
+          return deepEqual(
+            state.newVersionsNotifications,
+            newVersionsNotifications,
+          )
             ? state
-            : {appsVersionsSent: newAppsVersionsSent};
+            : {newVersionsNotifications};
         });
       },
     }),
     {
       name: STORAGE_ID,
       storage: createJSONStorage(() => zustandStorage),
+      migrate: (persistedState, version) =>
+        migrate(DEFAULT_STATE, persistedState, version),
+      partialize: state =>
+        Object.fromEntries(
+          Object.entries(state).filter(([key]) =>
+            PERSISTED_KEYS.includes(key as keyof useNotificationsState),
+          ),
+        ),
     },
   ),
 );

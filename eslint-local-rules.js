@@ -19,6 +19,7 @@ const useZustandStores = [
   'useSession',
   'useToast',
   'usePulsingStyles',
+  'useInstallations',
 ];
 
 const zustandFunctions = [
@@ -54,7 +55,12 @@ function isZustandFunction(variableName, calleeName) {
   );
 }
 
-const ReactReanimatedFunctions = ['useSharedValue', 'useAnimatedStyle'];
+const ReactReanimatedFunctions = [
+  'useSharedValue',
+  'useAnimatedStyle',
+  'useAnimatedRef',
+  'useScrollViewOffset',
+];
 const ReactReanimatedHooks = {
   usePulsing: 'pulsingStyles',
   useRotate: 'rotatingStyles',
